@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+google-genai
+docling
+rank-bm25
+markdown
+pydantic
+orjson
+python-multipart
+python-dotenv
