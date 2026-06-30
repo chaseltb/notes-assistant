@@ -1,0 +1,30 @@
+# Secrets — never commit
+study-ai/.env
+
+# Service account keys
+*.json
+!study-ai/frontend/package.json
+!study-ai/frontend/vite.config.js
+!study-ai/frontend/tailwind.config.js
+!study-ai/frontend/postcss.config.js
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Data (large files, rebuilt on sync)
+study-ai/data/raw/
+study-ai/data/markdown/
+study-ai/data/chunks/
+study-ai/data/bm25.pkl
+study-ai/data/manifest.json
+
+# Node
+study-ai/frontend/node_modules/
+study-ai/frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db
