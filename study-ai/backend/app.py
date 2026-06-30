@@ -8,7 +8,8 @@ import orjson
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, Form, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List
 
@@ -327,3 +328,15 @@ async def health(x_session_id: str = Header(default="default")):
         "indexed_documents": len(doc_names),
         "courses": len(courses),
     })
+
+
+# ── Serve React frontend (production build) ──────────────────────────────────
+# In local dev this is skipped because the Vite dev server handles the UI.
+# On Railway the Dockerfile builds the frontend into /app/static before starting.
+_STATIC_DIR = Path(__file__).parent / "static"
+if _STATIC_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=_STATIC_DIR / "assets"), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        return FileResponse(_STATIC_DIR / "index.html")
