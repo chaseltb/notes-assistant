@@ -7,6 +7,7 @@ study-ai/.env
 !study-ai/frontend/vite.config.js
 !study-ai/frontend/tailwind.config.js
 !study-ai/frontend/postcss.config.js
+!study-ai/frontend/vercel.json
 
 # Python
 __pycache__/
