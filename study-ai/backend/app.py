@@ -74,13 +74,13 @@ def _get_course(rel_path: Path) -> str:
     return "General"
 
 
-def _parse_and_index_files(file_paths: list[Path], manifest: dict, session_dir: Path) -> list[str]:
+def _parse_and_index_files(file_paths: list[Path], manifest: dict, session_dir: Path, base_dir: Path) -> list[str]:
     md_dir = session_dir / "markdown"
     md_dir.mkdir(parents=True, exist_ok=True)
 
     processed = []
     for file_path in file_paths:
-        rel = file_path.relative_to(NOTES_DIR)
+        rel = file_path.relative_to(base_dir)
         rel_str = rel.as_posix()
         course = _get_course(rel)
         mtime = file_path.stat().st_mtime
@@ -209,7 +209,7 @@ async def sync(x_session_id: str = Header(default="default")):
         updated.append(rel_str)
 
     if files_to_process:
-        _parse_and_index_files(files_to_process, manifest, session_dir)
+        _parse_and_index_files(files_to_process, manifest, session_dir, NOTES_DIR)
 
     _save_manifest(session_dir, manifest)
     _rebuild_chunks_and_index(manifest, session_dir)
@@ -228,9 +228,8 @@ async def upload(
     x_session_id: str = Header(default="default"),
 ):
     session_dir = session_data_dir(x_session_id)
-    session_dir.mkdir(parents=True, exist_ok=True)
-
-    dest_dir = NOTES_DIR / course
+    raw_base = session_dir / "raw"
+    dest_dir = raw_base / course
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     manifest = _load_manifest(session_dir)
@@ -248,7 +247,7 @@ async def upload(
         files_to_process.append(dest_path)
 
     if files_to_process:
-        _parse_and_index_files(files_to_process, manifest, session_dir)
+        _parse_and_index_files(files_to_process, manifest, session_dir, raw_base)
         _save_manifest(session_dir, manifest)
         _rebuild_chunks_and_index(manifest, session_dir)
 

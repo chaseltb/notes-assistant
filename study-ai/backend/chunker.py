@@ -45,8 +45,9 @@ def _chunk_paragraph_block(paragraphs: list[str], target: int = 500, overlap: in
     return chunks
 
 
-def chunk_markdown(md_text: str, document_name: str, source_filename: str) -> list[dict]:
-    course = document_name.split()[0] if " " in document_name else document_name
+def chunk_markdown(md_text: str, document_name: str, source_filename: str, course: str = "") -> list[dict]:
+    if not course:
+        course = document_name.split()[0] if " " in document_name else document_name
 
     # Split by headings
     heading_pattern = re.compile(r'^(#{1,3} .+)$', re.MULTILINE)
