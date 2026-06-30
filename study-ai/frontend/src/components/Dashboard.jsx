@@ -153,7 +153,7 @@ export default function Dashboard() {
           <div className="text-sm text-gray-400 mt-1">Indexed Documents</div>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <div className="text-3xl font-bold text-indigo-400">{health?.courses ?? courses.length || '—'}</div>
+          <div className="text-3xl font-bold text-indigo-400">{health?.courses ?? (courses.length || '—')}</div>
           <div className="text-sm text-gray-400 mt-1">Courses</div>
         </div>
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
