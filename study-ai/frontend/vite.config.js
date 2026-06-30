@@ -5,7 +5,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': { target: 'http://localhost:8000', rewrite: path => path.replace(/^\/api/, '') }
+      '/ask':        'http://localhost:8000',
+      '/sync':       'http://localhost:8000',
+      '/quiz':       'http://localhost:8000',
+      '/flashcards': 'http://localhost:8000',
+      '/upload':     'http://localhost:8000',
+      '/documents':  'http://localhost:8000',
+      '/health':     'http://localhost:8000',
     }
   }
 })
