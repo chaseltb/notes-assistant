@@ -80,6 +80,7 @@ export default function PracticeTest() {
         body: JSON.stringify(form),
       })
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
       setQuiz(data)
     } catch (err) {
       setError('Failed to generate quiz: ' + err.message)

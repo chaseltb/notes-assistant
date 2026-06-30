@@ -137,13 +137,16 @@ def _load_session_chunks(session_dir: Path) -> list[dict]:
     return load_chunks(chunks_file)
 
 
-def _call_gemini(prompt: str) -> str:
+def _call_gemini(prompt: str, json_mode: bool = False) -> str:
     from google import genai
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    config = {"system_instruction": SYSTEM_PROMPT}
+    if json_mode:
+        config["response_mime_type"] = "application/json"
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=prompt,
-        config={"system_instruction": SYSTEM_PROMPT},
+        config=config,
     )
     return response.text
 
@@ -284,10 +287,15 @@ async def ask(req: AskRequest, x_session_id: str = Header(default="default")):
 async def quiz(req: QuizRequest, x_session_id: str = Header(default="default")):
     session_dir = session_data_dir(x_session_id)
     bm25, chunks = _load_session_index(session_dir)
+    if not chunks:
+        return ORJSONResponse({"error": "No notes indexed yet. Upload some files first."}, status_code=400)
     results = search(req.topic or "study", bm25, chunks, top_k=15)
     prompt = build_quiz_prompt(req.topic, req.difficulty, req.mcq, req.short, req.long, results)
-    raw = _call_gemini(prompt)
-    data = parse_quiz_response(raw)
+    try:
+        raw = _call_gemini(prompt, json_mode=True)
+        data = parse_quiz_response(raw)
+    except Exception as e:
+        return ORJSONResponse({"error": f"Failed to generate quiz: {str(e)}"}, status_code=502)
     return ORJSONResponse(data)
 
 
@@ -295,10 +303,15 @@ async def quiz(req: QuizRequest, x_session_id: str = Header(default="default")):
 async def flashcards(req: FlashcardRequest, x_session_id: str = Header(default="default")):
     session_dir = session_data_dir(x_session_id)
     bm25, chunks = _load_session_index(session_dir)
+    if not chunks:
+        return ORJSONResponse({"error": "No notes indexed yet. Upload some files first."}, status_code=400)
     results = search(req.topic or "study", bm25, chunks, top_k=12)
     prompt = build_flashcard_prompt(req.topic, results)
-    raw = _call_gemini(prompt)
-    cards = parse_flashcard_response(raw)
+    try:
+        raw = _call_gemini(prompt, json_mode=True)
+        cards = parse_flashcard_response(raw)
+    except Exception as e:
+        return ORJSONResponse({"error": f"Failed to generate flashcards: {str(e)}"}, status_code=502)
     return ORJSONResponse(cards)
 
 

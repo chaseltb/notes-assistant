@@ -41,6 +41,7 @@ export default function Flashcards() {
         body: JSON.stringify({ topic }),
       })
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`)
       setCards(Array.isArray(data) ? data : [])
     } catch (err) {
       setError('Failed to generate flashcards: ' + err.message)
