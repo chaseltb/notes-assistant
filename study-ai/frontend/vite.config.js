@@ -12,6 +12,7 @@ export default defineConfig({
       '/upload':     'http://localhost:8000',
       '/documents':  'http://localhost:8000',
       '/health':     'http://localhost:8000',
+      '/logs':       'http://localhost:8000',
     }
   }
 })
