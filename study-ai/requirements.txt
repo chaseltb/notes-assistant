@@ -1,7 +1,9 @@
 fastapi
 uvicorn[standard]
 google-genai
-docling
+pypdf
+python-docx
+python-pptx
 rank-bm25
 markdown
 pydantic
