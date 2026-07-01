@@ -1,19 +1,39 @@
+import collections
 import hashlib
 import json
+import logging
 import os
 import shutil
+import traceback
 from pathlib import Path
 
 import orjson
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, Form, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List
 
 load_dotenv()
+
+# ── Logging ──────────────────────────────────────────────────────────────────
+_LOG_BUFFER: collections.deque = collections.deque(maxlen=300)
+
+class _BufferHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        _LOG_BUFFER.append(self.format(record))
+
+_fmt = logging.Formatter("%(asctime)s %(levelname)-8s %(message)s", datefmt="%H:%M:%S")
+_buf_handler = _BufferHandler()
+_buf_handler.setFormatter(_fmt)
+
+_stream_handler = logging.StreamHandler()
+_stream_handler.setFormatter(_fmt)
+
+logging.basicConfig(level=logging.INFO, handlers=[_buf_handler, _stream_handler])
+logger = logging.getLogger("study_ai")
 
 from parser import parse_to_markdown
 from chunker import chunk_markdown, load_chunks, save_chunks
@@ -80,24 +100,30 @@ def _parse_and_index_files(file_paths: list[Path], manifest: dict, session_dir: 
 
     processed = []
     for file_path in file_paths:
-        rel = file_path.relative_to(base_dir)
-        rel_str = rel.as_posix()
-        course = _get_course(rel)
-        mtime = file_path.stat().st_mtime
-        file_hash = _file_hash(file_path)
+        try:
+            rel = file_path.relative_to(base_dir)
+            rel_str = rel.as_posix()
+            course = _get_course(rel)
+            mtime = file_path.stat().st_mtime
+            file_hash = _file_hash(file_path)
 
-        md_stem = rel_str.replace("/", "__").replace("\\", "__")
-        md_path = md_dir / (Path(md_stem).stem + ".md")
+            md_stem = rel_str.replace("/", "__").replace("\\", "__")
+            md_path = md_dir / (Path(md_stem).stem + ".md")
 
-        parse_to_markdown(file_path, md_path)
+            logger.info("Parsing %s (course=%s)", file_path.name, course)
+            parse_to_markdown(file_path, md_path)
+            logger.info("Parsed  %s → %s", file_path.name, md_path.name)
 
-        manifest[rel_str] = {
-            "course": course,
-            "filename": file_path.name,
-            "modified": mtime,
-            "hash": file_hash,
-        }
-        processed.append(rel_str)
+            manifest[rel_str] = {
+                "course": course,
+                "filename": file_path.name,
+                "modified": mtime,
+                "hash": file_hash,
+            }
+            processed.append(rel_str)
+        except Exception:
+            logger.error("Failed to parse %s:\n%s", file_path.name, traceback.format_exc())
+            raise
 
     return processed
 
@@ -113,6 +139,7 @@ def _rebuild_chunks_and_index(manifest: dict, session_dir: Path) -> list[dict]:
         md_stem = rel_str.replace("/", "__").replace("\\", "__")
         md_path = md_dir / (Path(md_stem).stem + ".md")
         if not md_path.exists():
+            logger.warning("Markdown not found for %s, skipping", rel_str)
             continue
         md_text = md_path.read_text(encoding="utf-8")
         file_chunks = chunk_markdown(md_text, info["filename"], rel_str, course=info["course"])
@@ -124,6 +151,7 @@ def _rebuild_chunks_and_index(manifest: dict, session_dir: Path) -> list[dict]:
     chunks_file.parent.mkdir(parents=True, exist_ok=True)
     save_chunks(all_chunks, chunks_file)
     build_index(all_chunks, bm25_path)
+    logger.info("Index rebuilt: %d chunks across %d documents", len(all_chunks), len(manifest))
     return all_chunks
 
 
@@ -243,17 +271,29 @@ async def upload(
         filename = Path(upload.filename).name
         ext = Path(filename).suffix.lower()
         if ext not in SUPPORTED_EXTENSIONS:
+            logger.warning("Skipping unsupported file: %s", filename)
             continue
         dest_path = dest_dir / filename
-        dest_path.write_bytes(await upload.read())
+        content = await upload.read()
+        dest_path.write_bytes(content)
+        logger.info("Saved upload: %s (%d bytes) → course=%s", filename, len(content), course)
         saved.append(filename)
         files_to_process.append(dest_path)
 
-    if files_to_process:
+    if not files_to_process:
+        logger.warning("Upload had no supported files")
+        return ORJSONResponse({"saved": [], "error": "No supported files found (.pdf .docx .pptx .md .txt)"})
+
+    try:
         _parse_and_index_files(files_to_process, manifest, session_dir, raw_base)
         _save_manifest(session_dir, manifest)
         _rebuild_chunks_and_index(manifest, session_dir)
+    except Exception:
+        err = traceback.format_exc()
+        logger.error("Upload processing failed:\n%s", err)
+        return ORJSONResponse({"error": "Processing failed — check /logs for details"}, status_code=500)
 
+    logger.info("Upload complete: %s", saved)
     return ORJSONResponse({"saved": saved})
 
 
@@ -340,6 +380,12 @@ async def health(x_session_id: str = Header(default="default")):
         "indexed_documents": len(doc_names),
         "courses": len(courses),
     })
+
+
+@app.get("/logs")
+async def logs():
+    text = "\n".join(_LOG_BUFFER) if _LOG_BUFFER else "(no logs yet)"
+    return PlainTextResponse(text)
 
 
 # ── Serve React frontend (production build) ──────────────────────────────────

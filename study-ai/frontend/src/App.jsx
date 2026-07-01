@@ -4,9 +4,10 @@ import Dashboard from './components/Dashboard.jsx'
 import Ask from './components/Ask.jsx'
 import PracticeTest from './components/PracticeTest.jsx'
 import Flashcards from './components/Flashcards.jsx'
+import Logs from './components/Logs.jsx'
 import { getSessionId } from './session.js'
 
-const TABS = ['Dashboard', 'Ask', 'Practice Test', 'Flashcards']
+const TABS = ['Dashboard', 'Ask', 'Practice Test', 'Flashcards', 'Logs']
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('Dashboard')
@@ -43,6 +44,7 @@ export default function App() {
         {activeTab === 'Ask' && <Ask />}
         {activeTab === 'Practice Test' && <PracticeTest />}
         {activeTab === 'Flashcards' && <Flashcards />}
+        {activeTab === 'Logs' && <Logs />}
       </main>
     </div>
   )
