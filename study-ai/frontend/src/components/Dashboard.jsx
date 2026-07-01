@@ -223,11 +223,24 @@ export default function Dashboard() {
         />
 
         {uploadResult && (
-          <div className="bg-green-900/30 border border-green-700 rounded-lg p-3 text-sm text-green-300">
-            Uploaded {uploadResult.saved?.length ?? 0} file{uploadResult.saved?.length !== 1 ? 's' : ''}, indexed successfully.
-            {uploadResult.saved?.length > 0 && (
-              <div className="mt-1 text-green-400">{uploadResult.saved.join(', ')}</div>
-            )}
+          <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 text-sm text-green-300 space-y-3">
+            <div>
+              Indexed {uploadResult.saved?.length ?? 0} file{uploadResult.saved?.length !== 1 ? 's' : ''} successfully.
+            </div>
+            {uploadResult.detected?.map((d, i) => (
+              <div key={i} className="bg-gray-900/60 rounded-lg p-3 space-y-1">
+                <div className="font-semibold text-white">{d.title || d.filename}</div>
+                {d.subject && <div className="text-xs text-indigo-400">{d.subject}</div>}
+                {d.summary && <div className="text-xs text-gray-400">{d.summary}</div>}
+                {d.topics?.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {d.topics.map((t, j) => (
+                      <span key={j} className="text-xs bg-indigo-900/50 text-indigo-300 border border-indigo-700 px-2 py-0.5 rounded-full">{t}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 

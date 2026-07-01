@@ -38,7 +38,7 @@ logger = logging.getLogger("study_ai")
 from parser import parse_to_markdown
 from chunker import chunk_markdown, load_chunks, save_chunks
 from search import build_index, load_index, search
-from prompts import SYSTEM_PROMPT, build_ask_prompt, build_flashcard_prompt, build_quiz_prompt
+from prompts import SYSTEM_PROMPT, build_ask_prompt, build_flashcard_prompt, build_quiz_prompt, build_topic_prompt
 from quiz import parse_flashcard_response, parse_quiz_response
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent.parent / "data"))
@@ -94,6 +94,20 @@ def _get_course(rel_path: Path) -> str:
     return "General"
 
 
+def _detect_topics(md_path: Path) -> dict:
+    try:
+        md_text = md_path.read_text(encoding="utf-8")
+        prompt = build_topic_prompt(md_text)
+        raw = _call_gemini(prompt, json_mode=True)
+        import json as _json
+        data = _json.loads(raw)
+        logger.info("Topics detected for %s: %s", md_path.name, data.get("title", "?"))
+        return data
+    except Exception as e:
+        logger.warning("Topic detection failed for %s: %s", md_path.name, e)
+        return {}
+
+
 def _parse_and_index_files(file_paths: list[Path], manifest: dict, session_dir: Path, base_dir: Path) -> list[str]:
     md_dir = session_dir / "markdown"
     md_dir.mkdir(parents=True, exist_ok=True)
@@ -114,11 +128,15 @@ def _parse_and_index_files(file_paths: list[Path], manifest: dict, session_dir: 
             parse_to_markdown(file_path, md_path)
             logger.info("Parsed  %s → %s", file_path.name, md_path.name)
 
+            # Detect topics from the parsed markdown
+            topics = _detect_topics(md_path)
+
             manifest[rel_str] = {
                 "course": course,
                 "filename": file_path.name,
                 "modified": mtime,
                 "hash": file_hash,
+                "topics": topics,
             }
             processed.append(rel_str)
         except Exception:
@@ -306,7 +324,12 @@ async def upload(
         return ORJSONResponse({"error": "Processing failed — check /logs for details"}, status_code=500)
 
     logger.info("Upload complete: %s", saved)
-    return ORJSONResponse({"saved": saved})
+    # Collect detected topics for each saved file to return to the frontend
+    detected = []
+    for rel_str, info in manifest.items():
+        if info.get("filename") in saved and info.get("topics"):
+            detected.append({"filename": info["filename"], **info["topics"]})
+    return ORJSONResponse({"saved": saved, "detected": detected})
 
 
 @app.post("/ask")
