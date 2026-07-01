@@ -166,17 +166,29 @@ def _load_session_chunks(session_dir: Path) -> list[dict]:
 
 
 def _call_gemini(prompt: str, json_mode: bool = False) -> str:
+    import time
     from google import genai
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     config = {"system_instruction": SYSTEM_PROMPT}
     if json_mode:
         config["response_mime_type"] = "application/json"
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config=config,
-    )
-    return response.text
+
+    delays = [1, 3, 6]
+    last_exc = None
+    for attempt, delay in enumerate(delays, start=1):
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=config,
+            )
+            return response.text
+        except Exception as e:
+            last_exc = e
+            if attempt < len(delays):
+                log(f"Gemini attempt {attempt} failed ({e}), retrying in {delay}s...")
+                time.sleep(delay)
+    raise last_exc
 
 
 # ── Pydantic models ──────────────────────────────────────────────────────────
